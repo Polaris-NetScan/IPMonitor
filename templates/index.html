@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Monitoring Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+		.red-dot {
+		    background-color: red;
+		    border-radius: 50%;
+		    width: 30px;
+		    height: 30px;
+		    border: 2px solid red;
+		}
+
+		.blue-dot {
+		    background-color: green;
+		    border-radius: 50%;
+		    width: 30px;
+		    height: 30px;
+		    border: 2px solid green;
+		}
+
+        #map {
+            height: 700px;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .modal-card-body {
+            overflow-y: auto;
+        }
+
+        .modal-card {
+            width: 90%;
+            max-width: 600px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar is-primary">
+        <div class="navbar-brand">
+            <a class="navbar-item" href="#">
+                <strong>IP Monitoring Dashboard</strong>
+            </a>
+            <span class="navbar-burger burger" data-target="navbarMenu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="title has-text-centered">IP Monitoring Dashboard</h1>
+        <div class="columns is-multiline">
+            <!-- Table Column -->
+            <div class="column is-12-tablet is-6-desktop">
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped is-hoverable is-narrow">
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Server Name</th>
+                                <th>Status</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for server in servers %}
+                            <tr>
+                                <td>{{ server[1] }}</td> <!-- ip_address -->
+                                <td>{{ server[2] }}</td> <!-- server_name -->
+                                <td>{{ server[3] }}</td> <!-- status -->
+                                <td>{{ server[4] }}</td> <!-- latitude -->
+                                <td>{{ server[5] }}</td> <!-- longitude -->
+                                <td>
+                                    <button class="button is-warning is-small"
+                                        onclick="openEditModal({{ server[0] }}, '{{ server[1] }}', '{{ server[2] }}', '{{ server[4] }}', '{{ server[5] }}')">
+                                        Edit
+                                    </button>
+                                    <a href="{{ url_for('delete_server', id=server[0]) }}" class="button is-danger is-small">Delete</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <button class="button is-primary mt-4" onclick="openAddModal()">Add New Server</button>
+            </div>
+
+            <!-- Map Column -->
+            <div class="column is-12-tablet is-6-desktop">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Server Modal -->
+    <div id="addServerModal" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Add New Server</p>
+                <button class="delete" aria-label="close" onclick="closeAddModal()"></button>
+            </header>
+            <section class="modal-card-body">
+                <form id="addServerForm" method="POST" action="{{ url_for('add_server') }}">
+                    <div class="field">
+                        <label class="label">IP Address</label>
+                        <div class="control">
+                            <input class="input" type="text" name="ip_address" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label">Server Name</label>
+                        <div class="control">
+                            <input class="input" type="text" name="server_name" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-primary" type="submit">Add Server</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <!-- Edit Server Modal -->
+    <div id="editServerModal" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Edit Server</p>
+                <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+            </header>
+            <section class="modal-card-body">
+                <form id="editServerForm" method="POST" action="">
+                    <input type="hidden" id="editServerId" name="id">
+                    <div class="field">
+                        <label class="label">IP Address</label>
+                        <div class="control">
+                            <input class="input" type="text" id="editIpAddress" name="ip_address" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label">Server Name</label>
+                        <div class="control">
+                            <input class="input" type="text" id="editServerName" name="server_name" required>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label">Latitude</label>
+                        <div class="control">
+                            <input class="input" type="text" id="editLatitude" name="latitude">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label">Longitude</label>
+                        <div class="control">
+                            <input class="input" type="text" id="editLongitude" name="longitude">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-primary" type="submit">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Toggle the navigation menu on small screens
+        document.querySelector('.navbar-burger').addEventListener('click', function () {
+            document.getElementById('navbarMenu').classList.toggle('is-active');
+        });
+
+        function openAddModal() {
+            document.getElementById('addServerModal').classList.add('is-active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addServerModal').classList.remove('is-active');
+        }
+
+        function openEditModal(id, ipAddress, serverName, latitude, longitude) {
+            if (id) {  // Check if id is valid
+                document.getElementById('editServerId').value = id;
+                document.getElementById('editIpAddress').value = ipAddress;
+                document.getElementById('editServerName').value = serverName;
+                document.getElementById('editLatitude').value = latitude || '';
+                document.getElementById('editLongitude').value = longitude || '';
+                document.getElementById('editServerForm').action = `/update/${id}`;
+                document.getElementById('editServerModal').classList.add('is-active');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editServerModal').classList.remove('is-active');
+        }
+
+        var map = L.map('map').setView([12.8797, 121.7740], 6); // Center on the Philippines with zoom level 6
+
+        // Add a tile layer to the map (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // List of servers from the server-side
+        var servers = {{ servers|tojson }};
+
+        servers.forEach(function (server) {
+            var status = server[3]; // Status of the server
+            var latitude = server[4];
+            var longitude = server[5];
+            var markerColor = status === 'Up' ? 'blue' : 'red';
+            var markerIcon = L.divIcon({ className: markerColor + '-dot' });
+
+            L.marker([latitude, longitude], { icon: markerIcon }).addTo(map)
+                .bindPopup('<b>IP Address:</b> ' + server[1] + '<br>' +
+                           '<b>Server Name:</b> ' + server[2] + '<br>' +
+                           '<b>Status:</b> ' + status);
+        });
+    </script>
+</body>
+
+</html>
